@@ -1,5 +1,7 @@
 import os
+from random import randint
 from PIL import Image
+import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import random
@@ -21,7 +23,8 @@ class ImageVisualizer(object):
     def __init__(self, idx_to_name, class_colors=None, save_dir=None):
         self.idx_to_name = idx_to_name
         if class_colors is None or len(class_colors) != len(self.idx_to_name):
-            self.class_colors = [[0, 255, 0]] * len(self.idx_to_name)
+            self.class_colors = [[randint(0, 255), randint(0, 255), randint(0, 255)] for i in range(len(self.idx_to_name))]
+            # self.class_colors = [[0, 255, 0]] * len(self.idx_to_name)
         else:
             self.class_colors = class_colors
 
@@ -31,6 +34,34 @@ class ImageVisualizer(object):
             self.save_dir = save_dir
 
         os.makedirs(self.save_dir, exist_ok=True)
+
+
+    def save_image_cv(self, image, boxes, labels, scores, name):
+        save_path = os.path.join(self.save_dir, name)
+
+        for b, l, s in zip(boxes, labels, scores):
+            class_id = l - 1
+            class_name = self.idx_to_name[class_id]
+
+            # class_id = int(l)
+            # class_name = classes[class_id]
+            xmin, ymin, xmax, ymax = list(map(int, b))
+            score = '{:.4f}'.format(s)
+            color = self.class_colors[class_id]
+            label = '-'.join([class_name, score])
+            # print(xmin, ymin, xmax, ymax, color, label)
+
+            ret, baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 1)
+            cv2.rectangle(image, (xmin, ymax - ret[1] - baseline), (xmin + ret[0], ymax), color, -1)
+            cv2.putText(image, label, (xmin, ymax - baseline), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+
+        # cv2.imshow(name, image)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+        cv2.imwrite(save_path, image)
+
 
     def save_image(self, img, boxes, labels, name):
         """ Method to draw boxes and labels
@@ -45,6 +76,8 @@ class ImageVisualizer(object):
         plt.figure()
         fig, ax = plt.subplots(1)
         ax.imshow(img)
+        print(ax.size())
+        # Image.save(img, boxes, labels)
         save_path = os.path.join(self.save_dir, name)
 
         for i, box in enumerate(boxes):
