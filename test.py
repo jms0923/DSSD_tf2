@@ -1,3 +1,4 @@
+import time
 import argparse
 import tensorflow as tf
 import os
@@ -13,24 +14,17 @@ from image_utils import ImageVisualizer
 from losses import create_losses
 from network import create_ssd
 from PIL import Image
-
+import cv2
 
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--data-dir", default="/home/globus/minseok/Datasets/LG_Classification/LSK_VOC"
-)
+parser.add_argument("--data-dir", default="/home/globus/minseok/dataset/LSK_VOC/")
+parser.add_argument("--save-dir", default="outputs/images")
 parser.add_argument("--data-year", default="2007")
 parser.add_argument("--arch", default="ssd300")
 parser.add_argument("--num-examples", default=-1, type=int)
-parser.add_argument("--pretrained-type", default="specified")
-parser.add_argument(
-    "--checkpoint-dir",
-    default="/home/globus/minseok/lg_classification/ssd-tf2/checkpoints",
-)
-parser.add_argument(
-    "--checkpoint-path",
-    default="/home/globus/minseok/lg_classification/ssd-tf2/checkpoints/ssd_epoch_120.h5",
-)
+parser.add_argument("--pretrained-type", default="latest")   # specified
+parser.add_argument("--checkpoint-dir",default="/home/globus/minseok/DSSD_tf2/checkpoints/")
+parser.add_argument("--checkpoint-path", default="/home/globus/minseok/lg_classification/ssd-tf2/checkpoints/ssd_epoch_120.ckpt")
 parser.add_argument("--gpu-id", default="0")
 
 args = parser.parse_args()
@@ -121,18 +115,24 @@ if __name__ == "__main__":
 
     os.makedirs("outputs/images", exist_ok=True)
     os.makedirs("outputs/detects", exist_ok=True)
-    visualizer = ImageVisualizer(info["idx_to_name"], save_dir="outputs/images")
+    visualizer = ImageVisualizer(info["idx_to_name"], save_dir=args.save_dir)
 
-    for i, (filename, imgs, gt_confs, gt_locs) in enumerate(
-        tqdm(batch_generator, total=info["length"], desc="Testing...", unit="images")
-    ):
+    for i, (filename, imgs, gt_confs, gt_locs) in enumerate(tqdm(batch_generator, total=info["length"], desc="Testing...", unit="images")):
+        start = time.time()
         boxes, classes, scores = predict(imgs, default_boxes)
+        print(time.time() - start)
         filename = filename.numpy()[0].decode()
-        original_image = Image.open(
-            os.path.join(info["image_dir"], "{}.jpg".format(filename))
-        )
-        boxes *= original_image.size * 2
-        visualizer.save_image(original_image, boxes, classes, "{}.jpg".format(filename))
+        # original_image = Image.open(os.path.join(info["image_dir"], "{}.jpg".format(filename)))
+        original_image = cv2.imread(os.path.join(info["image_dir"], "{}.jpg".format(filename)), cv2.IMREAD_COLOR)
+
+        # boxes *= original_image.size * 2
+        origin_h, origin_w, _ = original_image.shape
+        boxes[:,:1] *= origin_w
+        boxes[:,1:2] *= origin_h
+        boxes[:,2:3] *= origin_w
+        boxes[:,3:4] *= origin_h
+        # visualizer.save_image(original_image, boxes, classes, "{}.jpg".format(filename))
+        visualizer.save_image_cv(original_image, boxes, classes, scores, "{}.jpg".format(filename))
 
         log_file = os.path.join("outputs/detects", "{}.txt")
 

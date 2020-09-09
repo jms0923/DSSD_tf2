@@ -15,7 +15,7 @@ from losses import create_losses
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--data-dir",
-    default="/home/globus/minseok/Datasets/LG_Classification/LSK_VOC",
+    default="/home/globus/minseok/dataset/LSK_VOC/",
     type=str,
 )
 parser.add_argument("--data-year", default="2007")
@@ -165,6 +165,6 @@ if __name__ == "__main__":
             tf.summary.scalar("loc_loss", avg_val_loc_loss, step=epoch)
 
         if (epoch + 1) % 10 == 0:
-            ssd.save_weights(
-                os.path.join(args.checkpoint_dir, "ssd_epoch_{}.h5".format(epoch + 1))
-            )
+            # ssd.save_weights(os.path.join(args.checkpoint_dir, "ssd_epoch_{}.h5".format(epoch + 1)))
+            ssd.save(os.path.join(args.checkpoint_dir), save_format='tf')
+
