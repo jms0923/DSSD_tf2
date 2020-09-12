@@ -91,6 +91,7 @@ if __name__ == "__main__":
             args.pretrained_type,
             checkpoint_dir=args.checkpoint_dir,
         )
+        
     except Exception as e:
         print(e)
         print("The program is exiting...")
