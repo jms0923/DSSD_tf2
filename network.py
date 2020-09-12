@@ -1,5 +1,6 @@
 from tensorflow.keras import Model
 from tensorflow.keras.applications import VGG16
+from tensorflow.keras.applications import ResNet101
 import tensorflow.keras.layers as layers
 import tensorflow as tf
 import numpy as np
@@ -26,6 +27,8 @@ class SSD(Model):
         self.conf_head_layers = create_conf_head_layers(num_classes)
         self.loc_head_layers = create_loc_head_layers()
 
+        self.init_resnet()
+
         if arch == 'ssd300':
             self.extra_layers.pop(-1)
             self.conf_head_layers.pop(-2)
@@ -47,6 +50,25 @@ class SSD(Model):
         loc = tf.reshape(loc, [loc.shape[0], -1, 4])
 
         return conf, loc
+
+
+    def init_resnet(self):
+        origin_resnet101 = ResNet101(weights='imagenet')    # , input_shape=(321, 321, 3)
+        resnet101_321 = ResNet101(input_shape=(321, 321, 3), weights=None)
+        
+        # print(origin_resnet101.summary())
+        # print(resnet101_321.summary())
+        
+        origin_resnet101_json = origin_resnet101.to_json()
+        resnet101_321_json = resnet101_321.to_json()
+        
+
+        with open(os.path.join('/home/globus/minseok/DSSD_tf2/origin_resnet101.json'), 'w') as f:
+            f.write(origin_resnet101_json)
+        with open(os.path.join('/home/globus/minseok/DSSD_tf2/resnet101_321.json'), 'w') as fi:
+            fi.write(resnet101_321_json)
+        print('end of save resnet models')
+
 
     def init_vgg16(self):
         """ Initialize the VGG16 layers from pretrained weights
@@ -88,6 +110,7 @@ class SSD(Model):
         head_idx = 0
         for i in range(len(self.vgg16_conv4.layers)):
             x = self.vgg16_conv4.get_layer(index=i)(x)
+            # extract feature from conv4_3
             if i == len(self.vgg16_conv4.layers) - 5:
                 conf, loc = self.compute_heads(self.batch_norm(x), head_idx)
                 confs.append(conf)
@@ -130,6 +153,7 @@ def create_ssd(num_classes, arch, pretrained_type,
     net(tf.random.normal((1, 512, 512, 3)))
     if pretrained_type == 'base':
         net.init_vgg16()
+        
     elif pretrained_type == 'latest':
         try:
             paths = [os.path.join(checkpoint_dir, path)
