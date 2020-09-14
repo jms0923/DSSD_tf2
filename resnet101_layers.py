@@ -148,16 +148,16 @@ def conv5_layer(x):
   
     for i in range(3):     
         if(i == 0):            
-            x = Conv2D(512, (1, 1), strides=(2, 2), padding='valid')(x)
+            x = Conv2D(512, (1, 1), strides=(1, 1), padding='valid')(x)
             x = BatchNormalization()(x)
             x = Activation('relu')(x)        
             
-            x = Conv2D(512, (3, 3), strides=(1, 1), dilation_rate=2, padding='same')(x)
+            x = Conv2D(512, (3, 3), strides=(1, 1), dilation_rate=(2, 2), padding='same')(x)
             x = BatchNormalization()(x)
             x = Activation('relu')(x)  
  
             x = Conv2D(2048, (1, 1), strides=(1, 1), padding='valid')(x)
-            shortcut = Conv2D(2048, (1, 1), strides=(2, 2), padding='valid')(shortcut)
+            shortcut = Conv2D(2048, (1, 1), strides=(1, 1), padding='valid')(shortcut)
             x = BatchNormalization()(x)
             shortcut = BatchNormalization()(shortcut)            
  
@@ -171,7 +171,7 @@ def conv5_layer(x):
             x = BatchNormalization()(x)
             x = Activation('relu')(x)
             
-            x = Conv2D(512, (3, 3), strides=(1, 1), padding='same')(x)
+            x = Conv2D(512, (3, 3), strides=(1, 1), dilation_rate=(2, 2), padding='same')(x)
             x = BatchNormalization()(x)
             x = Activation('relu')(x)
  
@@ -202,6 +202,40 @@ def create_resnet101_layers():
     resnet101_conv5 = tf.keras.Model(input_layer, out_layer)
 
     return resnet101_conv3, resnet101_conv5
+
+
+def create_ssd_layers():
+    """ Create extra layers
+        8th to 11th blocks
+    """
+    extra_layers = [
+    # 6th block output shape: B, 512, 10, 10
+    block6 = Sequential(layers=[
+        layers.Conv2D(256, 1, activation='relu', padding='same'),
+        layers.Conv2D(512, 3, strides=2, padding='same', activation='relu'),], name='block6'),
+
+    # 7th block output shape: B, 256, 5, 5
+    block7 = Sequential(layers=[
+        layers.Conv2D(128, 1, padding='same', activation='relu'),
+        layers.Conv2D(256, 3, strides=2, padding='same', activation='relu'),], name='block7'),
+
+    # 8th block output shape: B, 256, 3, 3
+    block8 = Sequential(layers=[
+        layers.Conv2D(128, 1, padding='same', activation='relu'),
+        layers.Conv2D(256, 3, strides=1, padding='valid', activation='relu'),], name='block8'),
+
+    # 9th block output shape: B, 256, 1, 1
+    block9 = Sequential(layers=[
+        layers.Conv2D(128, 1, padding='same', activation='relu'),
+        layers.Conv2D(256, 3, strides=1, padding='valid', activation='relu'),], name='block9'),
+
+    # 10th block output shape: B, 256, 1, 1
+    block10 = Sequential(layers=[
+        layers.Conv2D(128, 1, padding='same', activation='relu'),
+        layers.Conv2D(256, 4, padding='same', activation='relu'),], name='block10')
+        ]
+
+    return extra_layers
 
 
 # have to add head layer, location layer
