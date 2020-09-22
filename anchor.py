@@ -40,7 +40,7 @@ def generate_default_boxes(config):
             ])
 
             for ratio in ratios[m]:
-                r = math.sqrt(ratio)
+                r = math.sqrt(float(ratio))
                 default_boxes.append([
                     cx,
                     cy,
@@ -55,8 +55,11 @@ def generate_default_boxes(config):
                     scales[m] * r
                 ])
 
+        # print('fm_sizes / default_boxes : ', fm_sizes, '/', len(default_boxes))
+
     default_boxes = tf.constant(default_boxes)
     default_boxes = tf.clip_by_value(default_boxes, 0.0, 1.0)
+    # print('default_boxes : ', default_boxes.shape)
 
     return default_boxes
 

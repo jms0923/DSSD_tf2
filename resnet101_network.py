@@ -7,32 +7,48 @@ import numpy as np
 import os
 
 from layers import create_vgg16_layers, create_extra_layers, create_conf_head_layers, create_loc_head_layers
+from resnet101_layers import create_resnet101_layers, create_ssd_layers, create_deconv_layer, create_prediction_layer, create_cls_head_layers, create_loc_head_layers
 
 
-class SSD(Model):
+class DSSD(Model):
     """ Class for SSD model
     Attributes:
         num_classes: number of classes
     """
 
-    def __init__(self, num_classes, arch='ssd300'):
-        super(SSD, self).__init__()
+    def __init__(self, num_classes, arch='dssd320', config=None):
+        super(DSSD, self).__init__()
         self.num_classes = num_classes
-        self.vgg16_conv4, self.vgg16_conv7 = create_vgg16_layers()
+        self.resnet101_conv3, self.resnet101_conv5 = create_resnet101_layers()
+
+        # print(self.resnet101_conv3.summary())
+        # print(self.resnet101_conv5.summary())
+
         self.batch_norm = layers.BatchNormalization(
             beta_initializer='glorot_uniform',
             gamma_initializer='glorot_uniform'
         )
-        self.extra_layers = create_extra_layers()
-        self.conf_head_layers = create_conf_head_layers(num_classes)
+        self.ssd_layers = create_ssd_layers()
+
+        self.deconv_layers = []
+        for idx, resol in enumerate(config['deconv_resolutions']):
+            # print("config['fm_sizes'] : ", config['fm_sizes'][idx], config['fm_sizes'][idx+1])
+            self.deconv_layers.append(create_deconv_layer(idx, (config['fm_sizes'][idx], config['fm_sizes'][idx+1]), resol))
+
+        self.prediction_modules = []
+        for idx in range(6):
+            self.prediction_modules.append(create_prediction_layer(idx))
+        
+        self.cls_head_layers = create_cls_head_layers(num_classes)
         self.loc_head_layers = create_loc_head_layers()
 
-        self.init_resnet()
+        # self.init_resnet101()
 
-        if arch == 'ssd300':
-            self.extra_layers.pop(-1)
-            self.conf_head_layers.pop(-2)
-            self.loc_head_layers.pop(-2)
+        # if arch == 'ssd300':
+        #     self.extra_layers.pop(-1)
+        #     self.conf_head_layers.pop(-2)
+        #     self.loc_head_layers.pop(-2)
+
 
     def compute_heads(self, x, idx):
         """ Compute outputs of classification and regression heads
@@ -43,59 +59,19 @@ class SSD(Model):
             conf: output of the idx-th classification head
             loc: output of the idx-th regression head
         """
-        conf = self.conf_head_layers[idx](x)
+        conf = self.cls_head_layers[idx](x)
+        # print('idx : ', idx)
+        # print('conf : ', conf)
         conf = tf.reshape(conf, [conf.shape[0], -1, self.num_classes])
+        # print('conf reshape : ', conf, '\n')
 
         loc = self.loc_head_layers[idx](x)
+        # print('loc : ', loc)
         loc = tf.reshape(loc, [loc.shape[0], -1, 4])
+        # print('loc reshape : ', loc, '\n')
 
         return conf, loc
 
-
-    def init_resnet(self):
-        origin_resnet101 = ResNet101(weights='imagenet')    # , input_shape=(321, 321, 3)
-        resnet101_321 = ResNet101(input_shape=(321, 321, 3), weights=None)
-        
-        # print(origin_resnet101.summary())
-        # print(resnet101_321.summary())
-        
-        origin_resnet101_json = origin_resnet101.to_json()
-        resnet101_321_json = resnet101_321.to_json()
-        
-
-        with open(os.path.join('/home/globus/minseok/DSSD_tf2/origin_resnet101.json'), 'w') as f:
-            f.write(origin_resnet101_json)
-        with open(os.path.join('/home/globus/minseok/DSSD_tf2/resnet101_321.json'), 'w') as fi:
-            fi.write(resnet101_321_json)
-        print('end of save resnet models')
-
-
-    def init_vgg16(self):
-        """ Initialize the VGG16 layers from pretrained weights
-            and the rest from scratch using xavier initializer
-        """
-        origin_vgg = VGG16(weights='imagenet')
-        for i in range(len(self.vgg16_conv4.layers)):
-            self.vgg16_conv4.get_layer(index=i).set_weights(
-                origin_vgg.get_layer(index=i).get_weights())
-
-        fc1_weights, fc1_biases = origin_vgg.get_layer(index=-3).get_weights()
-        fc2_weights, fc2_biases = origin_vgg.get_layer(index=-2).get_weights()
-
-        conv6_weights = np.random.choice(
-            np.reshape(fc1_weights, (-1,)), (3, 3, 512, 1024))
-        conv6_biases = np.random.choice(
-            fc1_biases, (1024,))
-
-        conv7_weights = np.random.choice(
-            np.reshape(fc2_weights, (-1,)), (1, 1, 1024, 1024))
-        conv7_biases = np.random.choice(
-            fc2_biases, (1024,))
-
-        self.vgg16_conv7.get_layer(index=2).set_weights(
-            [conv6_weights, conv6_biases])
-        self.vgg16_conv7.get_layer(index=3).set_weights(
-            [conv7_weights, conv7_biases])
 
     def call(self, x):
         """ The forward pass
@@ -108,39 +84,51 @@ class SSD(Model):
         confs = []
         locs = []
         head_idx = 0
-        for i in range(len(self.vgg16_conv4.layers)):
-            x = self.vgg16_conv4.get_layer(index=i)(x)
-            # extract feature from conv4_3
-            if i == len(self.vgg16_conv4.layers) - 5:
-                conf, loc = self.compute_heads(self.batch_norm(x), head_idx)
-                confs.append(conf)
-                locs.append(loc)
-                head_idx += 1
+        features = []
 
-        x = self.vgg16_conv7(x)
+        x = self.resnet101_conv3(x)
+        conv3_feature = x
+        features.append(conv3_feature)
 
-        conf, loc = self.compute_heads(x, head_idx)
+        x = self.resnet101_conv5(x)
+        conv5_feature = x
 
+        for layer in self.ssd_layers:
+            x = layer(x)
+            features.append(x)
+        # print('x before compute_heads : ', x.get_shape().as_list())
+
+        # block 10 (last ssd layer)
+        pred = self.prediction_modules[0](features.pop(-1))
+        conf, loc = self.compute_heads(pred, 0)
         confs.append(conf)
         locs.append(loc)
-        head_idx += 1
 
-        for layer in self.extra_layers:
-            x = layer(x)
-            conf, loc = self.compute_heads(x, head_idx)
+        for order in range(len(features)):
+            # print('\nfeature call num : ', order)
+            # print('x shape : ', x.get_shape().as_list())
+            # print('feature shape : ', features[-1].get_shape().as_list(), '\n')
+            x = self.deconv_layers[order]([x, features.pop(-1)])
+            print('call deconv layer')
+            pred = self.prediction_modules[order+1](x)
+            conf, loc = self.compute_heads(pred, order+1)
             confs.append(conf)
             locs.append(loc)
-            head_idx += 1
 
         confs = tf.concat(confs, axis=1)
         locs = tf.concat(locs, axis=1)
 
+        # print('net confs return : ', confs.shape)
+        # print('net locs return : ', locs.shape)
+
+
         return confs, locs
 
 
-def create_ssd(num_classes, arch, pretrained_type,
+def create_dssd(num_classes, arch, pretrained_type,
                checkpoint_dir=None,
-               checkpoint_path=None):
+               checkpoint_path=None,
+               config=None):
     """ Create SSD model and load pretrained weights
     Args:
         num_classes: number of classes
@@ -149,11 +137,12 @@ def create_ssd(num_classes, arch, pretrained_type,
     Returns:
         net: the SSD model
     """
-    net = SSD(num_classes, arch)
-    net(tf.random.normal((1, 512, 512, 3)))
+    net = DSSD(num_classes, arch, config)
+    # net(tf.random.normal((1, 512, 512, 3)))
     if pretrained_type == 'base':
-        net.init_vgg16()
-        
+        # he layer initiate when declare layers
+        pass
+
     elif pretrained_type == 'latest':
         try:
             paths = [os.path.join(checkpoint_dir, path)
@@ -164,7 +153,7 @@ def create_ssd(num_classes, arch, pretrained_type,
             print('Please make sure there is at least one checkpoint at {}'.format(
                 checkpoint_dir))
             print('The model will be loaded from base weights.')
-            net.init_vgg16()
+            # net.init_vgg16()
         except ValueError as e:
             raise ValueError(
                 'Please check the following\n1./ Is the path correct: {}?\n2./ Is the model architecture correct: {}?'.format(
@@ -172,17 +161,18 @@ def create_ssd(num_classes, arch, pretrained_type,
         except Exception as e:
             print(e)
             raise ValueError('Please check if checkpoint_dir is specified')
+
     elif pretrained_type == 'specified':
         if not os.path.isfile(checkpoint_path):
             raise ValueError(
                 'Not a valid checkpoint file: {}'.format(checkpoint_path))
-
         try:
             net.load_weights(checkpoint_path)
         except Exception as e:
             raise ValueError(
                 'Please check the following\n1./ Is the path correct: {}?\n2./ Is the model architecture correct: {}?'.format(
                     checkpoint_path, arch))
+
     else:
         raise ValueError('Unknown pretrained type: {}'.format(pretrained_type))
     return net

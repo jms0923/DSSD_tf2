@@ -9,6 +9,7 @@ from tensorflow.keras.optimizers.schedules import PiecewiseConstantDecay
 from voc_data import create_batch_generator
 from anchor import generate_default_boxes
 from network import create_ssd
+from resnet101_network import create_dssd
 from losses import create_losses
 
 
@@ -19,7 +20,7 @@ parser.add_argument(
     type=str,
 )
 parser.add_argument("--data-year", default="2007")
-parser.add_argument("--arch", default="ssd300")
+parser.add_argument("--arch", default="dssd320")   # ssd300
 parser.add_argument("--batch-size", default=8, type=int)
 parser.add_argument("--num-batches", default=-1, type=int)
 parser.add_argument("--neg-ratio", default=3, type=int)
@@ -39,19 +40,16 @@ NUM_CLASSES = 8
 
 
 @tf.function
-def train_step(imgs, gt_confs, gt_locs, ssd, criterion, optimizer):
+def train_step(imgs, gt_confs, gt_locs, network, criterion, optimizer):
     with tf.GradientTape() as tape:
-        confs, locs = ssd(imgs)
-
+        confs, locs = network(imgs)
         conf_loss, loc_loss = criterion(confs, locs, gt_confs, gt_locs)
-
         loss = conf_loss + loc_loss
-        l2_loss = [tf.nn.l2_loss(t) for t in ssd.trainable_variables]
+        l2_loss = [tf.nn.l2_loss(t) for t in network.trainable_variables]
         l2_loss = args.weight_decay * tf.math.reduce_sum(l2_loss)
         loss += l2_loss
-
-    gradients = tape.gradient(loss, ssd.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, ssd.trainable_variables))
+    gradients = tape.gradient(loss, network.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, network.trainable_variables))
 
     return loss, conf_loss, loc_loss, l2_loss
 
@@ -69,10 +67,8 @@ if __name__ == "__main__":
 
     default_boxes = generate_default_boxes(config)
 
-    print(
-        "args.data_dir : ",
-        args.data_dir,
-    )
+    print("args.data_dir : ", args.data_dir)
+
     batch_generator, val_generator, info = create_batch_generator(
         args.data_dir,
         args.data_year,
@@ -85,12 +81,25 @@ if __name__ == "__main__":
     )  # the patching algorithm is currently causing bottleneck sometimes
 
     try:
-        ssd = create_ssd(
-            NUM_CLASSES,
-            args.arch,
-            args.pretrained_type,
-            checkpoint_dir=args.checkpoint_dir,
-        )
+        if 'dssd' in args.arch:
+            network = create_dssd(
+                NUM_CLASSES,
+                args.arch,
+                args.pretrained_type,
+                checkpoint_dir=args.checkpoint_dir,
+                checkpoint_path=None,
+                config=config
+            )
+
+        else:
+            network = create_ssd(
+                NUM_CLASSES,
+                args.arch,
+                args.pretrained_type,
+                checkpoint_dir=args.checkpoint_dir,
+                checkpoint_path=None,
+                config=config
+            )
         
     except Exception as e:
         print(e)
@@ -123,7 +132,7 @@ if __name__ == "__main__":
         start = time.time()
         for i, (_, imgs, gt_confs, gt_locs) in enumerate(batch_generator):
             loss, conf_loss, loc_loss, l2_loss = train_step(
-                imgs, gt_confs, gt_locs, ssd, criterion, optimizer
+                imgs, gt_confs, gt_locs, network, criterion, optimizer
             )
             avg_loss = (avg_loss * i + loss.numpy()) / (i + 1)
             avg_conf_loss = (avg_conf_loss * i + conf_loss.numpy()) / (i + 1)
@@ -143,8 +152,9 @@ if __name__ == "__main__":
         avg_val_loss = 0.0
         avg_val_conf_loss = 0.0
         avg_val_loc_loss = 0.0
+
         for i, (_, imgs, gt_confs, gt_locs) in enumerate(val_generator):
-            val_confs, val_locs = ssd(imgs)
+            val_confs, val_locs = network(imgs)
             val_conf_loss, val_loc_loss = criterion(
                 val_confs, val_locs, gt_confs, gt_locs
             )
@@ -166,6 +176,6 @@ if __name__ == "__main__":
             tf.summary.scalar("loc_loss", avg_val_loc_loss, step=epoch)
 
         if (epoch + 1) % 10 == 0:
-            # ssd.save_weights(os.path.join(args.checkpoint_dir, "ssd_epoch_{}.h5".format(epoch + 1)))
-            ssd.save(os.path.join(args.checkpoint_dir), save_format='tf')
+            # network.save_weights(os.path.join(args.checkpoint_dir, "network{}.h5".format(epoch + 1)))
+            network.save(os.path.join(args.checkpoint_dir), save_format='tf')
 

@@ -1,6 +1,5 @@
 from tensorflow.keras import Model
 from tensorflow.keras.applications import VGG16
-from tensorflow.keras.applications import ResNet101
 import tensorflow.keras.layers as layers
 import tensorflow as tf
 import numpy as np
@@ -19,6 +18,10 @@ class SSD(Model):
         super(SSD, self).__init__()
         self.num_classes = num_classes
         self.vgg16_conv4, self.vgg16_conv7 = create_vgg16_layers()
+
+        print(self.vgg16_conv4.summary())
+        print(self.vgg16_conv7.summary())
+
         self.batch_norm = layers.BatchNormalization(
             beta_initializer='glorot_uniform',
             gamma_initializer='glorot_uniform'
@@ -27,12 +30,11 @@ class SSD(Model):
         self.conf_head_layers = create_conf_head_layers(num_classes)
         self.loc_head_layers = create_loc_head_layers()
 
-        self.init_resnet()
-
         if arch == 'ssd300':
             self.extra_layers.pop(-1)
             self.conf_head_layers.pop(-2)
             self.loc_head_layers.pop(-2)
+
 
     def compute_heads(self, x, idx):
         """ Compute outputs of classification and regression heads
@@ -50,24 +52,6 @@ class SSD(Model):
         loc = tf.reshape(loc, [loc.shape[0], -1, 4])
 
         return conf, loc
-
-
-    def init_resnet(self):
-        origin_resnet101 = ResNet101(weights='imagenet')    # , input_shape=(321, 321, 3)
-        resnet101_321 = ResNet101(input_shape=(321, 321, 3), weights=None)
-        
-        # print(origin_resnet101.summary())
-        # print(resnet101_321.summary())
-        
-        origin_resnet101_json = origin_resnet101.to_json()
-        resnet101_321_json = resnet101_321.to_json()
-        
-
-        with open(os.path.join('/home/globus/minseok/DSSD_tf2/origin_resnet101.json'), 'w') as f:
-            f.write(origin_resnet101_json)
-        with open(os.path.join('/home/globus/minseok/DSSD_tf2/resnet101_321.json'), 'w') as fi:
-            fi.write(resnet101_321_json)
-        print('end of save resnet models')
 
 
     def init_vgg16(self):
@@ -96,6 +80,7 @@ class SSD(Model):
             [conv6_weights, conv6_biases])
         self.vgg16_conv7.get_layer(index=3).set_weights(
             [conv7_weights, conv7_biases])
+
 
     def call(self, x):
         """ The forward pass
