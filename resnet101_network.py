@@ -21,6 +21,7 @@ class DSSD(Model):
         self.num_classes = num_classes
         self.resnet101_conv3, self.resnet101_conv5 = create_resnet101_layers()
 
+
         # print(self.resnet101_conv3.summary())
         # print(self.resnet101_conv5.summary())
 
@@ -87,6 +88,7 @@ class DSSD(Model):
         features = []
 
         x = self.resnet101_conv3(x)
+
         conv3_feature = x
         features.append(conv3_feature)
 
@@ -109,20 +111,22 @@ class DSSD(Model):
             # print('x shape : ', x.get_shape().as_list())
             # print('feature shape : ', features[-1].get_shape().as_list(), '\n')
             x = self.deconv_layers[order]([x, features.pop(-1)])
-            print('call deconv layer')
             pred = self.prediction_modules[order+1](x)
             conf, loc = self.compute_heads(pred, order+1)
+            # print('order : ', order, conf)
             confs.append(conf)
             locs.append(loc)
 
         confs = tf.concat(confs, axis=1)
         locs = tf.concat(locs, axis=1)
 
-        # print('net confs return : ', confs.shape)
-        # print('net locs return : ', locs.shape)
-
+        # print('net confs return : ', confs.shape, confs)
+        # print('net locs return : ', locs.shape, locs)
 
         return confs, locs
+
+
+
 
 
 def create_dssd(num_classes, arch, pretrained_type,
