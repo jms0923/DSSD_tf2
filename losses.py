@@ -55,8 +55,8 @@ class SSDLosses(object):
         # print('loss config : ', cross_entropy.get_config())
         # compute classification losses
         # without reduction
-        # print('gt_confs : ', gt_confs)
-        # print('confs : ', confs)
+        # print('gt_confs : ', gt_confs[0])
+        # print('confs : ', confs[0])
         temp_loss = cross_entropy(gt_confs, confs)
 
         pos_idx, neg_idx = hard_negative_mining(
