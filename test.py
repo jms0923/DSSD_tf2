@@ -13,18 +13,19 @@ from voc_data import create_batch_generator
 from image_utils import ImageVisualizer
 from losses import create_losses
 from network import create_ssd
+from resnet101_network import create_dssd
 from PIL import Image
 import cv2
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-dir", default="/home/globus/minseok/dataset/LSK_VOC/")
+parser.add_argument("--data-dir", default="/home/ubuntu/minseok/dataset/LG_Classfication/LSK_VOC/")
 parser.add_argument("--save-dir", default="outputs/images")
 parser.add_argument("--data-year", default="2007")
-parser.add_argument("--arch", default="ssd300")
+parser.add_argument("--arch", default="dssd320")
 parser.add_argument("--num-examples", default=-1, type=int)
-parser.add_argument("--pretrained-type", default="latest")   # specified
-parser.add_argument("--checkpoint-dir",default="/home/globus/minseok/DSSD_tf2/checkpoints/")
-parser.add_argument("--checkpoint-path", default="/home/globus/minseok/lg_classification/ssd-tf2/checkpoints/ssd_epoch_120.ckpt")
+parser.add_argument("--pretrained-type", default="specified")   # latest
+parser.add_argument("--checkpoint-dir",default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/")
+parser.add_argument("--checkpoint-path", default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/network4")
 parser.add_argument("--gpu-id", default="0")
 
 args = parser.parse_args()
@@ -33,10 +34,10 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
 NUM_CLASSES = 8
 BATCH_SIZE = 1
-
+THRESHOLD = 0.5
 
 def predict(imgs, default_boxes):
-    confs, locs = ssd(imgs)
+    confs, locs = network(imgs)
 
     confs = tf.squeeze(confs, 0)
     locs = tf.squeeze(locs, 0)
@@ -54,12 +55,11 @@ def predict(imgs, default_boxes):
     for c in range(1, NUM_CLASSES):
         cls_scores = confs[:, c]
 
-        score_idx = cls_scores > 0.6
+        score_idx = cls_scores > THRESHOLD
         # cls_boxes = tf.boolean_mask(boxes, score_idx)
         # cls_scores = tf.boolean_mask(cls_scores, score_idx)
         cls_boxes = boxes[score_idx]
         cls_scores = cls_scores[score_idx]
-
         nms_idx = compute_nms(cls_boxes, cls_scores, 0.45, 200)
         cls_boxes = tf.gather(cls_boxes, nms_idx)
         cls_scores = tf.gather(cls_scores, nms_idx)
@@ -101,13 +101,24 @@ if __name__ == "__main__":
     )
 
     try:
-        ssd = create_ssd(
-            NUM_CLASSES,
-            args.arch,
-            args.pretrained_type,
-            args.checkpoint_dir,
-            args.checkpoint_path,
-        )
+        if 'dssd' in args.arch:
+            network = create_dssd(
+                NUM_CLASSES,
+                args.arch,
+                args.pretrained_type,
+                checkpoint_dir=args.checkpoint_dir,
+                checkpoint_path=args.checkpoint_path,
+                config=config
+            )
+        else:
+            network = create_ssd(
+                NUM_CLASSES,
+                args.arch,
+                args.pretrained_type,
+                args.checkpoint_dir,
+                checkpoint_path=args.checkpoint_path,
+                config=config
+            )
     except Exception as e:
         print(e)
         print("The program is exiting...")

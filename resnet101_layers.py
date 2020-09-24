@@ -282,41 +282,88 @@ def create_ssd_layers():
         6th to 10th blocks
     """
 
-    extra_layers = [
-        # 6th block output shape: B, 512, 10, 10
-        Sequential(layers=[
-            Conv2D(1024, 3, dilation_rate=6, activation='relu', padding='same'),
-            BatchNormalization(),
-            Conv2D(1024, 1, dilation_rate=1, strides=1, padding='same', activation='relu'),
-            BatchNormalization(),
-        ], name='block6'),
+    extra_layers = []
 
-        # 6th block output shape: B, 512, 10, 10
-        Sequential(layers=[
-            Conv2D(256, 1, activation='relu', padding='same'),
-            Conv2D(512, 3, strides=2, padding='same', activation='relu'),
-        ], name='block7'),
+    # 6th block output shape: B, 20, 20, 1024
+    input_layer = Input(shape=[None, None, 2048])
+    x = Conv2D(1024, 3, dilation_rate=6, activation='relu', padding='same')(input_layer)
+    x = BatchNormalization()(x)
+    x = Conv2D(1024, 1, dilation_rate=1, strides=1, padding='same', activation='relu')(x)
+    x = BatchNormalization()(x)
+    block6 = tf.keras.Model(input_layer, x)
+    extra_layers.append(block6)    
 
-        # 7th block output shape: B, 256, 5, 5
-        Sequential(layers=[
-            Conv2D(128, 1, padding='same', activation='relu'),
-            Conv2D(256, 3, strides=2, padding='same', activation='relu'),
-        ], name='block8'),
+    # 7th block output shape: B, 10, 10, 512
+    input_layer = Input(shape=[None, None, 1024])
+    x = Conv2D(256, 1, activation='relu', padding='same')(input_layer)
+    x = Conv2D(512, 3, strides=2, padding='same', activation='relu')(x)
+    block7 = tf.keras.Model(input_layer, x)
+    extra_layers.append(block7)
 
-        # 8th block output shape: B, 256, 3, 3
-        Sequential(layers=[
-            Conv2D(128, 1, padding='same', activation='relu'),
-            Conv2D(256, 3, strides=2, padding='same', activation='relu'),
-        ], name='block9'),
+    # 8th block output shape: B, 5, 5, 256
+    input_layer = Input(shape=[None, None, 512])
+    x = Conv2D(128, 1, padding='same', activation='relu')(input_layer)
+    x = Conv2D(256, 3, strides=2, padding='same', activation='relu')(x)
+    block8 = tf.keras.Model(input_layer, x)
+    extra_layers.append(block8)
 
-        # 9th block output shape: B, 256, 1, 1
-        Sequential(layers=[
-            Conv2D(128, 1, padding='same', activation='relu'),
-            Conv2D(256, 3, strides=2, padding='valid', activation='relu'),
-        ], name='block10')
-    ]
+    # 9th block output shape: B, 3, 3, 256
+    input_layer = Input(shape=[None, None, 256])
+    x = Conv2D(128, 1, padding='same', activation='relu')(input_layer)
+    x = Conv2D(256, 3, strides=2, padding='same', activation='relu')(x)
+    block9 = tf.keras.Model(input_layer, x)
+    extra_layers.append(block9)
+
+    # 10th block output shape: B, 1, 1, 256
+    input_layer = Input(shape=[None, None, 256])
+    x = Conv2D(128, 1, padding='same', activation='relu')(input_layer)
+    x = Conv2D(256, 3, strides=2, padding='valid', activation='relu')(x)
+    block10 = tf.keras.Model(input_layer, x)
+    extra_layers.append(block10)
 
     return extra_layers
+
+
+# def create_ssd_layers():
+#     """ Create extra layers
+#         6th to 10th blocks
+#     """
+
+#     extra_layers = [
+#         # 6th block output shape: B, 20, 20, 1024
+#         Sequential(layers=[
+#             Conv2D(1024, 3, dilation_rate=6, activation='relu', padding='same'),
+#             BatchNormalization(),
+#             Conv2D(1024, 1, dilation_rate=1, strides=1, padding='same', activation='relu'),
+#             BatchNormalization(),
+#         ], name='block6'),
+
+#         # 7th block output shape: B, 10, 10, 512
+#         Sequential(layers=[
+#             Conv2D(256, 1, activation='relu', padding='same'),
+#             Conv2D(512, 3, strides=2, padding='same', activation='relu'),
+#         ], name='block7'),
+
+#         # 8th block output shape: B, 5, 5, 256
+#         Sequential(layers=[
+#             Conv2D(128, 1, padding='same', activation='relu'),
+#             Conv2D(256, 3, strides=2, padding='same', activation='relu'),
+#         ], name='block8'),
+
+#         # 9th block output shape: B, 3, 3, 256
+#         Sequential(layers=[
+#             Conv2D(128, 1, padding='same', activation='relu'),
+#             Conv2D(256, 3, strides=2, padding='same', activation='relu'),
+#         ], name='block9'),
+
+#         # 10th block output shape: B, 1, 1, 256
+#         Sequential(layers=[
+#             Conv2D(128, 1, padding='same', activation='relu'),
+#             Conv2D(256, 3, strides=2, padding='valid', activation='relu'),
+#         ], name='block10')
+#     ]
+
+#     return extra_layers
 
 
 def create_deconv_layer(module_num, fm_size, deconv_resolution):
@@ -361,13 +408,15 @@ def create_deconv_layer(module_num, fm_size, deconv_resolution):
     return deconv_module
 
 
-def create_prediction_layer(num_module):
+def create_prediction_layer(num_module, num_classes):
     baseName = 'pred_' + str(num_module+1)
     layerName = layerNameCreater(baseName=baseName)
+
     if num_module == 0:
         input_resolution = 256
     else:
         input_resolution = 512
+
     input_layer = Input(shape=[None, None, input_resolution])
     shortcut = input_layer
     x = Conv2D(256, 1, strides=1, padding='same', name=layerName.call('conv'))(input_layer)
@@ -382,19 +431,25 @@ def create_prediction_layer(num_module):
     shortcut = BatchNormalization(name=layerName.call('bn'))(shortcut)
 
     x = Add()([x, shortcut])
-    output_layer = Activation('relu', name=layerName.call('relu'))(x)
+    pred_out = Activation('relu', name=layerName.call('relu'))(x)
+    
+    conf = Conv2D(anchors[0] * num_classes, kernel_size=3, padding='same', name=layerName.call('conv'))(pred_out)
+    loc = Conv2D(anchors[0] * 4, kernel_size=3, padding='same', name=layerName.call('conv'))(pred_out)
 
-    pred_module = tf.keras.Model(input_layer, output_layer)
+    pred_module = tf.keras.Model(input_layer, [conf, loc])
 
     return pred_module
 
-
-# def prediction_layer(x):
-#     layerName = layerNameCreater(baseName='pred')
-
-#     shortcut = x
-    
-#     x = Conv2D(256, 1, strides=1, padding='same', name=layerName.call('conv'))(x)
+# def create_prediction_layer(num_module):
+#     baseName = 'pred_' + str(num_module+1)
+#     layerName = layerNameCreater(baseName=baseName)
+#     if num_module == 0:
+#         input_resolution = 256
+#     else:
+#         input_resolution = 512
+#     input_layer = Input(shape=[None, None, input_resolution])
+#     shortcut = input_layer
+#     x = Conv2D(256, 1, strides=1, padding='same', name=layerName.call('conv'))(input_layer)
 #     x = BatchNormalization(name=layerName.call('bn'))(x)
 #     x = Activation('relu', name=layerName.call('relu'))(x)
 #     x = Conv2D(256, 1, strides=1, padding='same', name=layerName.call('conv'))(x)
@@ -406,9 +461,11 @@ def create_prediction_layer(num_module):
 #     shortcut = BatchNormalization(name=layerName.call('bn'))(shortcut)
 
 #     x = Add()([x, shortcut])
-#     x = Activation('relu', name=layerName.call('relu'))(x)
+#     output_layer = Activation('relu', name=layerName.call('relu'))(x)
 
-#     return x
+#     pred_module = tf.keras.Model(input_layer, output_layer)
+
+#     return pred_module
 
 
 def create_cls_head_layers(num_classes):
