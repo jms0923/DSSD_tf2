@@ -21,7 +21,6 @@ class DSSD(Model):
         self.num_classes = num_classes
         self.resnet101_conv3, self.resnet101_conv5 = create_resnet101_layers()
 
-
         # print(self.resnet101_conv3.summary())
         # print(self.resnet101_conv5.summary())
 
@@ -38,7 +37,7 @@ class DSSD(Model):
 
         self.prediction_modules = []
         for idx in range(6):
-            self.prediction_modules.append(create_prediction_layer(idx))
+            self.prediction_modules.append(create_prediction_layer(idx, self.num_classes))
         
         self.cls_head_layers = create_cls_head_layers(num_classes)
         self.loc_head_layers = create_loc_head_layers()
@@ -51,7 +50,8 @@ class DSSD(Model):
         #     self.loc_head_layers.pop(-2)
 
 
-    def compute_heads(self, x, idx):
+    # def compute_heads(self, x, idx):
+    def compute_heads(self, conf, loc):
         """ Compute outputs of classification and regression heads
         Args:
             x: the input feature map
@@ -60,16 +60,11 @@ class DSSD(Model):
             conf: output of the idx-th classification head
             loc: output of the idx-th regression head
         """
-        conf = self.cls_head_layers[idx](x)
-        # print('idx : ', idx)
-        # print('conf : ', conf)
+        # conf = self.cls_head_layers[idx](x)
         conf = tf.reshape(conf, [conf.shape[0], -1, self.num_classes])
-        # print('conf reshape : ', conf, '\n')
 
-        loc = self.loc_head_layers[idx](x)
-        # print('loc : ', loc)
+        # loc = self.loc_head_layers[idx](x)
         loc = tf.reshape(loc, [loc.shape[0], -1, 4])
-        # print('loc reshape : ', loc, '\n')
 
         return conf, loc
 
@@ -101,8 +96,9 @@ class DSSD(Model):
         # print('x before compute_heads : ', x.get_shape().as_list())
 
         # block 10 (last ssd layer)
-        pred = self.prediction_modules[0](features.pop(-1))
-        conf, loc = self.compute_heads(pred, 0)
+        conf, loc = self.prediction_modules[0](features.pop(-1))
+        conf, loc = self.compute_heads(conf, loc)
+        # conf, loc = self.compute_heads(pred, 0)
         confs.append(conf)
         locs.append(loc)
 
@@ -111,8 +107,9 @@ class DSSD(Model):
             # print('x shape : ', x.get_shape().as_list())
             # print('feature shape : ', features[-1].get_shape().as_list(), '\n')
             x = self.deconv_layers[order]([x, features.pop(-1)])
-            pred = self.prediction_modules[order+1](x)
-            conf, loc = self.compute_heads(pred, order+1)
+            conf, loc = self.prediction_modules[order+1](x)
+            conf, loc = self.compute_heads(conf, loc)
+            # conf, loc = self.compute_heads(pred, order+1)
             # print('order : ', order, conf)
             confs.append(conf)
             locs.append(loc)
@@ -124,9 +121,6 @@ class DSSD(Model):
         # print('net locs return : ', locs.shape, locs)
 
         return confs, locs
-
-
-
 
 
 def create_dssd(num_classes, arch, pretrained_type,
@@ -142,7 +136,7 @@ def create_dssd(num_classes, arch, pretrained_type,
         net: the SSD model
     """
     net = DSSD(num_classes, arch, config)
-    # net(tf.random.normal((1, 512, 512, 3)))
+    # net.load_weights('/home/ubuntu/minseok/DSSD_tf2/checkpoints/network4')
     if pretrained_type == 'base':
         # he layer initiate when declare layers
         pass
@@ -167,9 +161,11 @@ def create_dssd(num_classes, arch, pretrained_type,
             raise ValueError('Please check if checkpoint_dir is specified')
 
     elif pretrained_type == 'specified':
-        if not os.path.isfile(checkpoint_path):
-            raise ValueError(
-                'Not a valid checkpoint file: {}'.format(checkpoint_path))
+        # print('checkpoint_path : ', checkpoint_path)
+
+        # if not os.path.isfile(checkpoint_path):
+        #     raise ValueError(
+        #         'Not a valid checkpoint file: {}'.format(checkpoint_path))
         try:
             net.load_weights(checkpoint_path)
         except Exception as e:

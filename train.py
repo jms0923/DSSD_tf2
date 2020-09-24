@@ -21,7 +21,7 @@ parser.add_argument(
 )
 parser.add_argument("--data-year", default="2007")
 parser.add_argument("--arch", default="dssd320")   # ssd300
-parser.add_argument("--batch-size", default=8, type=int)
+parser.add_argument("--batch-size", default=32, type=int)
 parser.add_argument("--num-batches", default=-1, type=int)
 parser.add_argument("--neg-ratio", default=3, type=int)
 parser.add_argument("--initial-lr", default=1e-3, type=float)
@@ -79,6 +79,7 @@ if __name__ == "__main__":
         mode="train",
         augmentation=["flip"],
     )  # the patching algorithm is currently causing bottleneck sometimes
+    print('batch_generator info : ', info)
 
     try:
         if 'dssd' in args.arch:
@@ -176,6 +177,6 @@ if __name__ == "__main__":
             tf.summary.scalar("loc_loss", avg_val_loc_loss, step=epoch)
 
         if (epoch + 1) % 1 == 0:
-            network.save_weights(os.path.join(args.checkpoint_dir, "network{}.h5".format(epoch + 1)))
-            # network.save(os.path.join(args.checkpoint_dir), save_format='tf')
+            network.save_weights(os.path.join(args.checkpoint_dir, "network{}".format(epoch + 1)))  # .h5
+            # network.save(os.path.join(args.checkpoint_dir, str(epoch+1))) # , save_format='tf'
 
