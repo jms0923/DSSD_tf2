@@ -25,7 +25,7 @@ parser.add_argument("--arch", default="dssd320")
 parser.add_argument("--num-examples", default=-1, type=int)
 parser.add_argument("--pretrained-type", default="specified")   # latest
 parser.add_argument("--checkpoint-dir",default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/")
-parser.add_argument("--checkpoint-path", default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/network4")
+parser.add_argument("--checkpoint-path", default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/network3000")
 parser.add_argument("--gpu-id", default="0")
 
 args = parser.parse_args()
@@ -133,6 +133,7 @@ if __name__ == "__main__":
         boxes, classes, scores = predict(imgs, default_boxes)
         print(time.time() - start)
         filename = filename.numpy()[0].decode()
+        print('filename : ', filename)
         # original_image = Image.open(os.path.join(info["image_dir"], "{}.jpg".format(filename)))
         original_image = cv2.imread(os.path.join(info["image_dir"], "{}.jpg".format(filename)), cv2.IMREAD_COLOR)
 
