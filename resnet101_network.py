@@ -23,25 +23,19 @@ class DSSD(Model):
 
         # print(self.resnet101_conv3.summary())
         # print(self.resnet101_conv5.summary())
-
-        self.batch_norm = layers.BatchNormalization(
-            beta_initializer='glorot_uniform',
-            gamma_initializer='glorot_uniform'
-        )
+        
         self.ssd_layers = create_ssd_layers()
 
         self.deconv_layers = []
         for idx, resol in enumerate(config['deconv_resolutions']):
             # print("config['fm_sizes'] : ", config['fm_sizes'][idx], config['fm_sizes'][idx+1])
             self.deconv_layers.append(create_deconv_layer(idx, (config['fm_sizes'][idx], config['fm_sizes'][idx+1]), resol))
-
         self.prediction_modules = []
         for idx in range(6):
             self.prediction_modules.append(create_prediction_layer(idx, self.num_classes))
         
         self.cls_head_layers = create_cls_head_layers(num_classes)
         self.loc_head_layers = create_loc_head_layers()
-
         # self.init_resnet101()
 
         # if arch == 'ssd300':
@@ -136,9 +130,13 @@ def create_dssd(num_classes, arch, pretrained_type,
         net: the SSD model
     """
     net = DSSD(num_classes, arch, config)
+    # net = net.build((16, 512, 512, 3))
+    # print(net.summary())
+    print()
     # net.load_weights('/home/ubuntu/minseok/DSSD_tf2/checkpoints/network4')
     if pretrained_type == 'base':
         # he layer initiate when declare layers
+
         pass
 
     elif pretrained_type == 'latest':

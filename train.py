@@ -20,16 +20,17 @@ parser.add_argument(
     type=str,
 )
 parser.add_argument("--data-year", default="2007")
-parser.add_argument("--arch", default="dssd320")   # ssd300
-parser.add_argument("--batch-size", default=32, type=int)
+parser.add_argument("--arch", default="dssd512")   # ssd300
+parser.add_argument("--batch-size", default=24, type=int)
 parser.add_argument("--num-batches", default=-1, type=int)
 parser.add_argument("--neg-ratio", default=3, type=int)
 parser.add_argument("--initial-lr", default=1e-3, type=float)
 parser.add_argument("--momentum", default=0.9, type=float)
 parser.add_argument("--weight-decay", default=5e-4, type=float)
-parser.add_argument("--num-epochs", default=120, type=int)
-parser.add_argument("--checkpoint-dir", default="checkpoints")
-parser.add_argument("--pretrained-type", default="base")
+parser.add_argument("--num-epochs", default=4000, type=int)
+parser.add_argument("--checkpoint-dir", default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/dssd512")
+parser.add_argument("--checkpoint-path", default="/home/ubuntu/minseok/DSSD_tf2/checkpoints/network120/network1200")
+parser.add_argument("--pretrained-type", default="base")    # specified
 parser.add_argument("--gpu-id", default="0")
 
 args = parser.parse_args()
@@ -88,7 +89,7 @@ if __name__ == "__main__":
                 args.arch,
                 args.pretrained_type,
                 checkpoint_dir=args.checkpoint_dir,
-                checkpoint_path=None,
+                checkpoint_path=args.checkpoint_path,
                 config=config
             )
 
@@ -98,7 +99,7 @@ if __name__ == "__main__":
                 args.arch,
                 args.pretrained_type,
                 checkpoint_dir=args.checkpoint_dir,
-                checkpoint_path=None,
+                checkpoint_path=args.checkpoint_path,
                 config=config
             )
         
@@ -138,17 +139,17 @@ if __name__ == "__main__":
             avg_loss = (avg_loss * i + loss.numpy()) / (i + 1)
             avg_conf_loss = (avg_conf_loss * i + conf_loss.numpy()) / (i + 1)
             avg_loc_loss = (avg_loc_loss * i + loc_loss.numpy()) / (i + 1)
-            if (i + 1) % 50 == 0:
-                print(
-                    "Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}".format(
-                        epoch + 1,
-                        i + 1,
-                        time.time() - start,
-                        avg_loss,
-                        avg_conf_loss,
-                        avg_loc_loss,
-                    )
-                )
+            # if (i + 1) % 50 == 0:
+        print(
+            "Epoch: {} Batch {} Time: {:.2}s | Loss: {:.4f} Conf: {:.4f} Loc: {:.4f}".format(
+                epoch + 1,
+                i + 1,
+                time.time() - start,
+                avg_loss,
+                avg_conf_loss,
+                avg_loc_loss,
+            )
+        )
 
         avg_val_loss = 0.0
         avg_val_conf_loss = 0.0
@@ -176,7 +177,7 @@ if __name__ == "__main__":
             tf.summary.scalar("conf_loss", avg_val_conf_loss, step=epoch)
             tf.summary.scalar("loc_loss", avg_val_loc_loss, step=epoch)
 
-        if (epoch + 1) % 1 == 0:
+        if (epoch + 1) % 50 == 0:
             network.save_weights(os.path.join(args.checkpoint_dir, "network{}".format(epoch + 1)))  # .h5
             # network.save(os.path.join(args.checkpoint_dir, str(epoch+1))) # , save_format='tf'
 

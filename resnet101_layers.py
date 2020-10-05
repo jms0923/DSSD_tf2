@@ -324,48 +324,6 @@ def create_ssd_layers():
     return extra_layers
 
 
-# def create_ssd_layers():
-#     """ Create extra layers
-#         6th to 10th blocks
-#     """
-
-#     extra_layers = [
-#         # 6th block output shape: B, 20, 20, 1024
-#         Sequential(layers=[
-#             Conv2D(1024, 3, dilation_rate=6, activation='relu', padding='same'),
-#             BatchNormalization(),
-#             Conv2D(1024, 1, dilation_rate=1, strides=1, padding='same', activation='relu'),
-#             BatchNormalization(),
-#         ], name='block6'),
-
-#         # 7th block output shape: B, 10, 10, 512
-#         Sequential(layers=[
-#             Conv2D(256, 1, activation='relu', padding='same'),
-#             Conv2D(512, 3, strides=2, padding='same', activation='relu'),
-#         ], name='block7'),
-
-#         # 8th block output shape: B, 5, 5, 256
-#         Sequential(layers=[
-#             Conv2D(128, 1, padding='same', activation='relu'),
-#             Conv2D(256, 3, strides=2, padding='same', activation='relu'),
-#         ], name='block8'),
-
-#         # 9th block output shape: B, 3, 3, 256
-#         Sequential(layers=[
-#             Conv2D(128, 1, padding='same', activation='relu'),
-#             Conv2D(256, 3, strides=2, padding='same', activation='relu'),
-#         ], name='block9'),
-
-#         # 10th block output shape: B, 1, 1, 256
-#         Sequential(layers=[
-#             Conv2D(128, 1, padding='same', activation='relu'),
-#             Conv2D(256, 3, strides=2, padding='valid', activation='relu'),
-#         ], name='block10')
-#     ]
-
-#     return extra_layers
-
-
 def create_deconv_layer(module_num, fm_size, deconv_resolution):
     # print('module_num : ', module_num)
     # print('fm_size : ', fm_size)
@@ -439,33 +397,6 @@ def create_prediction_layer(num_module, num_classes):
     pred_module = tf.keras.Model(input_layer, [conf, loc])
 
     return pred_module
-
-# def create_prediction_layer(num_module):
-#     baseName = 'pred_' + str(num_module+1)
-#     layerName = layerNameCreater(baseName=baseName)
-#     if num_module == 0:
-#         input_resolution = 256
-#     else:
-#         input_resolution = 512
-#     input_layer = Input(shape=[None, None, input_resolution])
-#     shortcut = input_layer
-#     x = Conv2D(256, 1, strides=1, padding='same', name=layerName.call('conv'))(input_layer)
-#     x = BatchNormalization(name=layerName.call('bn'))(x)
-#     x = Activation('relu', name=layerName.call('relu'))(x)
-#     x = Conv2D(256, 1, strides=1, padding='same', name=layerName.call('conv'))(x)
-#     x = BatchNormalization(name=layerName.call('bn'))(x)
-#     x = Activation('relu', name=layerName.call('relu'))(x)
-#     x = Conv2D(1024, 1, strides=1, padding='same', name=layerName.call('conv'))(x)
-
-#     shortcut = Conv2D(1024, 1, strides=1, padding='same', name=layerName.call('conv'))(shortcut)
-#     shortcut = BatchNormalization(name=layerName.call('bn'))(shortcut)
-
-#     x = Add()([x, shortcut])
-#     output_layer = Activation('relu', name=layerName.call('relu'))(x)
-
-#     pred_module = tf.keras.Model(input_layer, output_layer)
-
-#     return pred_module
 
 
 def create_cls_head_layers(num_classes):

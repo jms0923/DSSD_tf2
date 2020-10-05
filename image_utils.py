@@ -56,9 +56,10 @@ class ImageVisualizer(object):
             cv2.rectangle(image, (xmin, ymax - ret[1] - baseline), (xmin + ret[0], ymax), color, -1)
             cv2.putText(image, label, (xmin, ymax - baseline), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
-        # cv2.imshow(name, image)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
+        if name == '129.jpg':
+            cv2.imshow(name, image)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
         cv2.imwrite(save_path, image)
 
